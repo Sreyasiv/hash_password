@@ -4,91 +4,72 @@ const pinInput = document.getElementById('pin');
 const sha256HashView = document.getElementById('sha256-hash');
 const resultView = document.getElementById('result');
 
-// a function to store in the local storage
-function store(key, value) {
-  localStorage.setItem(key, value);
-}
+// Store data in local storage
+const store = (key, value) => localStorage.setItem(key, value);
 
-// a function to retrieve from the local storage
-function retrieve(key) {
-  return localStorage.getItem(key);
-}
+// Retrieve data from local storage
+const retrieve = (key) => localStorage.getItem(key);
 
-function getRandomArbitrary(min, max) {
-  let cached;
-  cached = Math.random() * (max - min) + min;
-  cached = Math.floor(cached);
-  return cached;
-}
+// Generate a random 3-digit number
+const getRandomNumber = () => Math.floor(Math.random() * (MAX - MIN + 1)) + MIN;
 
-// a function to clear the local storage
-function clear() {
-  localStorage.clear();
-}
-
-// a function to generate sha256 hash of the given string
+// Generate SHA256 hash of a given string
 async function sha256(message) {
-  // encode as UTF-8
-  const msgBuffer = new TextEncoder().encode(message);
-
-  // hash the message
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-
-  // convert ArrayBuffer to Array
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-
-  // convert bytes to hex string
-  const hashHex = hashArray
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-  return hashHex;
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    return Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
 }
 
+// Get or generate the SHA256 hash
 async function getSHA256Hash() {
-  let cached = retrieve('sha256');
-  if (cached) {
+    let cached = retrieve('sha256');
+    if (!cached) {
+        const randomNum = getRandomNumber().toString();
+        cached = await sha256(randomNum);
+        store('sha256', cached);
+    }
     return cached;
-  }
-
-  cached = await sha256(getRandomArbitrary(MIN, MAX));
-  store('sha256', cached);
-  return cached;
 }
 
+// Display the hash on page load
 async function main() {
-  sha256HashView.innerHTML = 'Calculating...';
-  const hash = await getSHA256Hash();
-  sha256HashView.innerHTML = hash;
+    sha256HashView.textContent = "Generating...";
+    const hash = await getSHA256Hash();
+    sha256HashView.textContent = hash;
 }
 
+// Check if user input matches the hash
 async function test() {
-  const pin = pinInput.value;
+    const pin = pinInput.value.trim();
 
-  if (pin.length !== 3) {
-    resultView.innerHTML = '💡 not 3 digits';
-    resultView.classList.remove('hidden');
-    return;
-  }
+    if (pin.length !== 3 || isNaN(pin)) {
+        resultView.textContent = "💡 Enter a valid 3-digit number!";
+        resultView.className = "fail";
+        resultView.style.display = "block";
+        return;
+    }
 
-  const sha256HashView = document.getElementById('sha256-hash');
-  const hasedPin = await sha256(pin);
+    const hashedPin = await sha256(pin);
+    const storedHash = sha256HashView.textContent;
 
-  if (hasedPin === sha256HashView.innerHTML) {
-    resultView.innerHTML = '🎉 success';
-    resultView.classList.add('success');
-  } else {
-    resultView.innerHTML = '❌ failed';
-  }
-  resultView.classList.remove('hidden');
+    if (hashedPin === storedHash) {
+        resultView.textContent = "🎉 Success! You found the number!";
+        resultView.className = "success";
+    } else {
+        resultView.textContent = "❌ Incorrect! Try again.";
+        resultView.className = "fail";
+    }
+    resultView.style.display = "block";
 }
 
-// ensure pinInput only accepts numbers and is 3 digits long
+// Allow only numeric input
 pinInput.addEventListener('input', (e) => {
-  const { value } = e.target;
-  pinInput.value = value.replace(/\D/g, '').slice(0, 3);
+    pinInput.value = e.target.value.replace(/\D/g, '').slice(0, 3);
 });
 
-// attach the test function to the button
+// Attach test function to button click
 document.getElementById('check').addEventListener('click', test);
 
 main();
